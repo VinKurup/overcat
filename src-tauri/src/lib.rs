@@ -18,7 +18,6 @@ impl CatSnapshot {
     }
 }
 
-/// Load the cat, age it by real elapsed time, persist, and hand it back.
 #[tauri::command]
 fn get_cat_state(app: AppHandle) -> Result<CatSnapshot, String> {
     let mut cat = state::load(&app);

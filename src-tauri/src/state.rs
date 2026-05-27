@@ -13,8 +13,6 @@ pub fn now() -> i64 {
         .unwrap_or(0)
 }
 
-/// A cat's temperament. Each variant is really a decay-rate profile: it bends how
-/// fast each stat falls, which is what makes the cat feel like it has a personality.
 #[derive(Serialize, Deserialize, Clone, Copy, Debug)]
 pub enum Personality {
     Playful, // happiness falls fast — needs enrichment/attention
@@ -26,8 +24,6 @@ pub enum Personality {
 }
 
 impl Personality {
-    /// Give each new cat a temperament derived from its birth time — no RNG crate
-    /// needed, and it satisfies the "some cats are just random" idea.
     fn from_seed(seed: i64) -> Self {
         match seed.rem_euclid(6) {
             0 => Personality::Playful,
@@ -39,7 +35,6 @@ impl Personality {
         }
     }
 
-    /// Per-hour decay multipliers for (satiety, happiness, energy).
     fn rate_multipliers(self) -> (f32, f32, f32) {
         match self {
             Personality::Playful => (1.0, 1.8, 1.0),
@@ -62,20 +57,18 @@ pub enum Mood {
     Sleepy,
 }
 
-/// The persisted cat. This struct *is* the schema: serde serializes it straight to
-/// `state.json`, so its shape defines exactly what's stored.
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct CatState {
     pub name: String,
     pub personality: Personality,
-    pub satiety: u8,   // 0..=100, 100 = full
-    pub happiness: u8, // 0..=100, 100 = content
-    pub energy: u8,    // 0..=100, 100 = rested
-    pub born_at: i64,  // unix secs — enables "age" later
+    pub satiety: u8,  
+    pub happiness: u8, 
+    pub energy: u8, 
+    pub born_at: i64,  
     pub last_updated: i64,
 }
 
-/// Base decay in points-per-hour, before personality multipliers.
 const BASE_SATIETY_PER_HOUR: f32 = 8.0;
 const BASE_HAPPINESS_PER_HOUR: f32 = 5.0;
 const BASE_ENERGY_PER_HOUR: f32 = 6.0;
@@ -94,8 +87,6 @@ impl CatState {
         }
     }
 
-    /// Age the cat by the real time elapsed since `last_updated`, then stamp `now`.
-    /// Stats floor at 0 — soft stakes, nothing ever dies.
     pub fn apply_decay(&mut self, now: i64) {
         let elapsed = (now - self.last_updated).max(0);
         let hours = elapsed as f32 / 3600.0;
@@ -107,7 +98,6 @@ impl CatState {
         self.last_updated = now;
     }
 
-    /// Derive the cat's mood from its current stats. Most critical state wins.
     pub fn mood(&self) -> Mood {
         if self.satiety <= 10 || self.happiness <= 10 {
             Mood::Sick
@@ -131,7 +121,6 @@ fn state_path(app: &AppHandle) -> Result<PathBuf, String> {
     Ok(dir.join("state.json"))
 }
 
-/// Load from disk; a missing or corrupt file yields a fresh cat.
 pub fn load(app: &AppHandle) -> CatState {
     let Ok(path) = state_path(app) else {
         return CatState::new();
@@ -179,7 +168,7 @@ mod tests {
     #[test]
     fn decay_floors_at_zero_never_negative() {
         let mut cat = fixture();
-        cat.apply_decay(1_000_000); // far future
+        cat.apply_decay(1_000_000);
         assert_eq!(cat.satiety, 0);
         assert_eq!(cat.happiness, 0);
         assert_eq!(cat.energy, 0);
@@ -187,7 +176,6 @@ mod tests {
 
     #[test]
     fn personality_bends_decay_rates() {
-        // Foodie gets hungry faster than a Chaotic cat over the same hour.
         let mut foodie = fixture();
         foodie.personality = Personality::Foodie;
         foodie.apply_decay(3600);
@@ -206,7 +194,7 @@ mod tests {
         cat.energy = 10;
         assert!(matches!(cat.mood(), Mood::Sleepy));
 
-        cat.satiety = 5; // critical beats sleepy
+        cat.satiety = 5;
         assert!(matches!(cat.mood(), Mood::Sick));
     }
 
